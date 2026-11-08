@@ -7,7 +7,7 @@ texto si mañana se usa WebSocket puro) con este sobre JSON:
      "payload": {...}}
 
 Cliente -> servidor
-    join       {name, session_token?, game_id?}
+    join       {name, session_token?, game_id?, deck?: [card_id, ...]}
     play_card  {card_id, expected_turn, source: "ui"|"camera", target_id?}  + action_id
     attack     {expected_turn, target_id?}                                  + action_id
     rematch    {}
@@ -17,6 +17,8 @@ Cliente -> servidor
 Servidor -> cliente
     welcome        {player_id, session_token, game_id, catalog, vision_available}
     state_update   {events: [{type, payload}], state}     + seq  (aplicar si seq > último)
+                   Eventos POR JUGADOR: en card_drawn la carta solo la ve su dueño
+                   (los demás reciben card: null).
     state_sync     {state}                                + seq  (aplicar siempre)
     card_detected  {frame_id, marker_ids, cards}
     error          {code, message}                        + action_id

@@ -4,8 +4,11 @@ Recibe *intenciones*, las valida, modifica el estado y devuelve un
 GameUpdate(seq, events). `seq` sube en cada cambio confirmado: los clientes
 descartan cualquier actualización con seq <= la última aplicada.
 
-Reglas del POC (v2):
-  1. Cada jugador empieza con 60 de vida (STARTING_LIFE) y una mano con una carta de cada tipo.
+Reglas del POC (v3, parámetros en rules.GameRules):
+  1. Cada jugador registra un mazo (por defecto data/decks.json "starter").
+     Al empezar se baraja, se reparten `initial_hand` cartas y la vida es
+     `starting_life`. Al empezar cada turno se roban `draw_per_turn` cartas
+     (el primer jugador no roba en su primer turno salvo `first_turn_draw`).
   2. En tu turno haces UNA acción:
        - play_card: solo si NO tienes criatura en mesa. La carta sale de tu mano,
          entra en mesa y ataca inmediatamente.
@@ -13,14 +16,23 @@ Reglas del POC (v2):
   3. El ataque golpea a la criatura rival; si la mata, el daño sobrante pasa
      al jugador. Sin criatura rival, el golpe va directo al jugador.
      Las criaturas destruidas van al descarte (no vuelven a la mano).
-  4. Pierdes si tu vida llega a 0, o si empieza tu turno sin criatura ni cartas.
+  4. Pierdes si tu vida llega a 0, o si empieza tu turno (tras robar) sin
+     criatura ni cartas en la mano.
   5. La partida termina siempre: cada turno hace >= 20 de daño y no hay curación.
+
+Información oculta: mazo (nadie) y mano (solo su dueño). Los eventos que
+revelan una carta robada llevan `_private_to`; `events_for(viewer)` los
+censura para los demás (card = None) antes de enviarlos.
+
+Azar: un random.Random por partida. Semilla opcional (tests, repeticiones);
+nunca se envía a los clientes: con ella podrían predecir los robos.
 
 Concurrencia: `self.lock` (RLock). La capa de red lo mantiene durante
 "aplicar acción + emitir", para que el orden de envío respete el de seq.
 """
 from __future__ import annotations
 
+import random
 import secrets
 import threading
 from collections import OrderedDict
@@ -29,6 +41,7 @@ from enum import Enum
 
 from .cards import CardCatalog, CardInstance, default_catalog
 from .player import Player
+from .rules import DEFAULT_RULES, DeckError, GameRules, starter_deck, validate_deck
 
 
 class GameStatus(str, Enum):
@@ -57,6 +70,16 @@ def event(type_: str, **payload) -> dict:
     return {"type": type_, "payload": payload}
 
 
+PRIVATE_KEY = "_private_to"
+
+
+def private_event(owner_id: str, type_: str, **payload) -> dict:
+    """Evento con información que solo debe ver `owner_id` (p. ej. la carta robada)."""
+    ev = event(type_, **payload)
+    ev[PRIVATE_KEY] = owner_id
+    return ev
+
+
 @dataclass(frozen=True)
 class GameUpdate:
     seq: int
@@ -67,10 +90,13 @@ class Game:
     MAX_REMEMBERED_ACTIONS = 256
 
     def __init__(self, game_id: str = "default", catalog: CardCatalog | None = None,
-                 max_players: int = 2) -> None:
+                 max_players: int = 2, rules: GameRules | None = None,
+                 seed: int | None = None) -> None:
         self.game_id = game_id
         self.catalog = catalog or default_catalog()
         self.max_players = max_players
+        self.rules = rules or DEFAULT_RULES
+        self._rng = random.Random(seed if seed is not None else secrets.randbits(64))
         self.lock = threading.RLock()
         self.seq = 0
         self.players: list[Player] = []
@@ -105,8 +131,10 @@ class Game:
         return self.players[self.turn_index]
 
     # -------------------------------------------------------------- jugadores
-    def join(self, name: str, session_token: str | None = None) -> tuple[Player, GameUpdate]:
-        """Entrar en la partida, o reconectar si se presenta un token válido."""
+    def join(self, name: str, session_token: str | None = None,
+             deck: list[str] | None = None) -> tuple[Player, GameUpdate]:
+        """Entrar en la partida, o reconectar si se presenta un token válido.
+        `deck`: mazo propio (lista de card_id); si falta, el mazo inicial."""
         with self.lock:
             if session_token and (player := self.find_by_token(session_token)):
                 player.connected = True
@@ -118,12 +146,17 @@ class Game:
                 # Hay un hueco porque alguien se fue: la sala vuelve a esperar.
                 self.status, self.winner_id, self.end_reason = GameStatus.WAITING, None, None
                 self.turn_number = 0
+            try:
+                deck_list = validate_deck(deck if deck is not None else starter_deck(),
+                                          self.catalog, self.rules)
+            except DeckError as exc:
+                raise GameError(str(exc), "invalid_deck") from None
             name = (name or "").strip()[:20] or f"Jugador {len(self.players) + 1}"
             player_id = secrets.token_hex(4)
             while self.get_player(player_id):
                 player_id = secrets.token_hex(4)
             player = Player(player_id=player_id, name=name,
-                            session_token=secrets.token_urlsafe(24))
+                            session_token=secrets.token_urlsafe(24), deck_list=deck_list)
             self.players.append(player)
             events = [event("player_joined", player_id=player_id, name=name)]
             if len(self.players) == self.max_players:
@@ -182,13 +215,32 @@ class Game:
     # ----------------------------------------------------------------- turnos
     def _start(self) -> list[dict]:
         for p in self.players:
-            p.reset_for_new_game(self.catalog.ids())
+            deck = list(p.deck_list)
+            self._rng.shuffle(deck)
+            p.reset_for_new_game(self.rules.starting_life, deck)
+            for _ in range(self.rules.initial_hand):
+                p.draw()
         self.status = GameStatus.IN_PROGRESS
         self.winner_id = self.end_reason = None
         self.turn_index, self.turn_number = 0, 1
         self._next_uid = 1
-        return [event("game_started", current_player_id=self.players[0].player_id,
-                      turn_number=1)]
+        events = [event("game_started", current_player_id=self.players[0].player_id,
+                         turn_number=1)]
+        if self.rules.first_turn_draw:
+            events += self._draw_for_turn(self.players[0])
+        return events
+
+    def _draw_for_turn(self, player: Player) -> list[dict]:
+        """Robo de inicio de turno. La carta solo la ve su dueño."""
+        events = []
+        for _ in range(self.rules.draw_per_turn):
+            card_id = player.draw()
+            if card_id is None:
+                break
+            events.append(private_event(player.player_id, "card_drawn", player_id=player.player_id,
+                                        card=self.catalog.get(card_id).to_dict(),
+                                        deck_count=len(player.deck)))
+        return events
 
     def _finish(self, winner: Player | None, reason: str) -> list[dict]:
         self.status = GameStatus.FINISHED
@@ -217,6 +269,7 @@ class Game:
             candidate = self.players[idx]
             if not candidate.is_active:
                 continue
+            draws = self._draw_for_turn(candidate)
             if not candidate.can_act:
                 candidate.eliminated = True
                 events.append(event("player_eliminated", player_id=candidate.player_id,
@@ -229,7 +282,7 @@ class Game:
             self.turn_number += 1
             events.append(event("turn_changed", current_player_id=candidate.player_id,
                                  turn_number=self.turn_number))
-            return events
+            return events + draws
         return events
 
     def _end_turn(self) -> list[dict]:
@@ -292,7 +345,8 @@ class Game:
             player.creature = creature
             events = [event("card_played", player_id=player_id, card=creature.to_dict(),
                             source=source)]
-            events += self._attack(creature, target)
+            if self.turn_number > 1 or self.rules.first_turn_attack:
+                events += self._attack(creature, target)
             events += self._end_turn()
             return self._finish_action(action_id, events)
 
@@ -344,14 +398,36 @@ class Game:
                 "winner_id": self.winner_id,
                 "end_reason": self.end_reason,
                 "players": [p.to_dict(viewer_id) for p in self.players],
+                "rules": {
+                    "starting_life": self.rules.starting_life,
+                    "initial_hand": self.rules.initial_hand,
+                    "draw_per_turn": self.rules.draw_per_turn,
+                },
             }
+
+    @staticmethod
+    def events_for(events: list[dict], viewer_id: str | None) -> list[dict]:
+        """Copia de `events` para `viewer_id`: quita la marca interna de privacidad
+        y censura la carta de los eventos privados de otros jugadores."""
+        visible = []
+        for ev in events:
+            owner = ev.get(PRIVATE_KEY)
+            if owner is None:
+                visible.append(ev)
+                continue
+            payload = dict(ev["payload"])
+            if owner != viewer_id:
+                payload["card"] = None
+            visible.append({"type": ev["type"], "payload": payload})
+        return visible
 
 
 class GameManager:
     """Registro de partidas. Hoy una ("default"); mañana salas/lobbies."""
 
-    def __init__(self, catalog: CardCatalog | None = None) -> None:
+    def __init__(self, catalog: CardCatalog | None = None, rules: GameRules | None = None) -> None:
         self.catalog = catalog or default_catalog()
+        self.rules = rules or DEFAULT_RULES
         self._games: dict[str, Game] = {}
         self._lock = threading.Lock()
 
@@ -361,7 +437,7 @@ class GameManager:
     def get_or_create(self, game_id: str = "default") -> Game:
         with self._lock:
             if game_id not in self._games:
-                self._games[game_id] = Game(game_id, self.catalog)
+                self._games[game_id] = Game(game_id, self.catalog, rules=self.rules)
             return self._games[game_id]
 
     def remove(self, game_id: str) -> None:

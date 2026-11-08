@@ -50,6 +50,7 @@ namespace CardWars.Core
         public const string PlayerReconnected = "player_reconnected";
         public const string PlayerLeft = "player_left";
         public const string RematchRequested = "rematch_requested";
+        public const string CardDrawn = "card_drawn";
     }
 
     public static class ErrorCode
@@ -60,6 +61,7 @@ namespace CardWars.Core
         public const string CardNotInHand = "card_not_in_hand";
         public const string CreatureInPlay = "creature_in_play";
         public const string NotJoined = "not_joined";
+        public const string InvalidDeck = "invalid_deck";
         public const string UnsupportedVersion = "unsupported_version";
     }
 
@@ -106,6 +108,7 @@ namespace CardWars.Core
         public List<CardInstance> Field = new List<CardInstance>();
         public List<string> Discard = new List<string>();
         public int HandCount;
+        public int DeckCount;      // cartas que quedan en su mazo (el contenido es secreto)
         public List<string> Hand;  // null si no eres tú (información oculta)
         public bool Connected;
         public bool Eliminated;
@@ -217,6 +220,14 @@ namespace CardWars.Core
         public int RemainingLife;
     }
 
+    /// <summary>card_drawn: Card solo viene para quien roba; el rival recibe null.</summary>
+    public class CardDrawnEvent
+    {
+        public string PlayerId;
+        public CardDefinition Card;
+        public int DeckCount;
+    }
+
     public class GameOverEvent
     {
         public string WinnerId;
@@ -229,6 +240,7 @@ namespace CardWars.Core
         public string Name;
         public string SessionToken;
         public string GameId;
+        public List<string> Deck;  // opcional: null = mazo inicial del servidor
     }
 
     public class PlayCardPayload

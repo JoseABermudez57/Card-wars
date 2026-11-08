@@ -17,6 +17,12 @@ except ImportError as exc:  # Flask no instalado: se saltan estos tests
     create_app = None
     IMPORT_ERROR = str(exc)
 
+from game.rules import GameRules  # noqa: E402
+
+ONE_OF_EACH = ["dragon", "warrior", "mage"]
+# Reglas "clásicas": mazo de 3, todo en la mano, nada que robar (determinista).
+CLASSIC = GameRules(initial_hand=3, deck_min=3)
+
 
 def msg(type_, payload=None, action_id=None):
     m = {"v": PROTOCOL_VERSION, "type": type_, "payload": payload or {}}
@@ -36,7 +42,7 @@ class FakeDetector:
 @unittest.skipIf(create_app is None, "Flask/Flask-SocketIO no instalados")
 class ServerTests(unittest.TestCase):
     def setUp(self):
-        self.app, self.socketio, self.server = create_app(grace_seconds=0.2,
+        self.app, self.socketio, self.server = create_app(grace_seconds=0.2, rules=CLASSIC,
                                                           detector=FakeDetector([2, 77]))
 
     def client(self):
@@ -49,7 +55,7 @@ class ServerTests(unittest.TestCase):
 
     def join(self, name, token=None):
         c = self.client()
-        payload = {"name": name}
+        payload = {"name": name, "deck": ONE_OF_EACH}
         if token:
             payload["session_token"] = token
         c.emit("msg", msg("join", payload))
@@ -103,6 +109,33 @@ class ServerTests(unittest.TestCase):
         a.emit("msg", m)
         self.assertEqual([x["type"] for x in self.received(a)], ["state_sync"])
         self.assertEqual(self.received(b), [])
+
+    def test_drawn_card_is_hidden_from_rival_over_network(self):
+        app, socketio, _ = create_app(detector=None)          # reglas por defecto: hay robo
+        a, b = socketio.test_client(app), socketio.test_client(app)
+        a.emit("msg", msg("join", {"name": "A"}))
+        b.emit("msg", msg("join", {"name": "B"}))
+        state_a = self.last_state(a)["payload"]["state"]
+        self.received(b)
+        me = next(p for p in state_a["players"] if "hand" in p)
+        a.emit("msg", msg("play_card", {"card_id": me["hand"][0], "expected_turn": 1}, "d1"))
+
+        def drawn(client):
+            update = self.last_state(client)["payload"]
+            return next(e for e in update["events"] if e["type"] == "card_drawn")["payload"], update["state"]
+
+        seen_by_b, state_b = drawn(b)
+        seen_by_a, _ = drawn(a)
+        hand_b = next(p for p in state_b["players"] if "hand" in p)["hand"]
+        self.assertEqual(seen_by_b["card"]["card_id"], hand_b[-1])   # B ve lo que robó
+        self.assertIsNone(seen_by_a["card"])                          # A no
+        self.assertNotIn("_private_to", str(seen_by_a) + str(seen_by_b))
+
+    def test_invalid_deck_rejected(self):
+        c = self.client()
+        c.emit("msg", msg("join", {"name": "X", "deck": ["mage", "mage", "mage"]}))
+        err = self.received(c, "error")[0]["payload"]
+        self.assertEqual(err["code"], "invalid_deck")
 
     def test_bad_messages(self):
         c = self.client()

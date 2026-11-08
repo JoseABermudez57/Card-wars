@@ -28,6 +28,7 @@ internal static class Program
         Run("Acción duplicada no se aplica dos veces", DuplicateAction);
         Run("Reconexión con token conserva el puesto", Reconnect);
         Run("Revancha", Rematch);
+        Run("Mazos: el robo es privado y los contadores cuadran", PrivateDraw);
 
         Console.WriteLine(_failures == 0 ? "\nTODO OK" : $"\n{_failures} escenario(s) FALLARON");
         return _failures == 0 ? 0 : 1;
@@ -86,14 +87,16 @@ internal static class Program
     private static void DuplicateAction()
     {
         var (a, b, _) = Pair();
-        var payload = new PlayCardPayload { CardId = "mage", ExpectedTurn = 1, Source = "ui" };
+        var card = a.Me.Hand[0];                       // con mazos barajados: una carta de MI mano
+        var attack = a.Catalog[card].Attack;
+        var payload = new PlayCardPayload { CardId = card, ExpectedTurn = 1, Source = "ui" };
         a.SendRawAsync(MessageType.PlayCard, payload, "dup-1").Wait();
         Check(WaitUntil(() => b.State.TurnNumber == 2, 3000, a, b), "la jugada no llegó");
         var life = b.Me.Life;
         a.SendRawAsync(MessageType.PlayCard, payload, "dup-1").Wait();   // reintento idéntico
         WaitUntil(() => false, 500, a, b);
-        Check(b.Me.Life == life && b.Me.Life == b.Me.MaxLife - 40,
-              $"vida de B debería seguir en {b.Me.MaxLife - 40}, es {b.Me.Life}");
+        Check(b.Me.Life == life && b.Me.Life == b.Me.MaxLife - attack,
+              $"vida de B debería seguir en {b.Me.MaxLife - attack}, es {b.Me.Life}");
         Dispose(a, b);
     }
 
@@ -126,6 +129,24 @@ internal static class Program
                         3000, a, b), "la revancha no empezó");
         Check(a.Me.MaxLife > 0 && a.Me.Life == a.Me.MaxLife && a.Me.Hand.Count == 3,
               "estado inicial incorrecto tras la revancha");
+        Dispose(a, b);
+    }
+
+    private static void PrivateDraw()
+    {
+        var (a, b, _) = Pair();
+        CardDrawnEvent seenByA = null, seenByB = null;
+        a.StateChanged += (s, events) => { foreach (var e in events) if (e.Type == GameEventType.CardDrawn) seenByA = e.PayloadAs<CardDrawnEvent>(); };
+        b.StateChanged += (s, events) => { foreach (var e in events) if (e.Type == GameEventType.CardDrawn) seenByB = e.PayloadAs<CardDrawnEvent>(); };
+        var deckBefore = b.Me.DeckCount;
+        Check(a.Me.Hand.Count == 3 && a.Me.DeckCount == 3, $"reparto inicial: mano {a.Me.Hand.Count}, mazo {a.Me.DeckCount}");
+        Check(b.Rival.Hand == null && b.Rival.DeckCount == 3, "B no debe ver la mano de A, solo contadores");
+        a.PlayCardAsync(a.Me.Hand[0]).Wait();
+        Check(WaitUntil(() => seenByA != null && seenByB != null, 3000, a, b), "no llegó card_drawn");
+        Check(seenByB.Card != null && seenByB.Card.CardId == b.Me.Hand[b.Me.Hand.Count - 1], "B debe ver la carta que robó");
+        Check(seenByA.Card == null, "A NO debe ver la carta que robó B");
+        Check(b.Me.DeckCount == deckBefore - 1 && seenByB.DeckCount == deckBefore - 1, "contador del mazo");
+        Console.WriteLine($"    B robó {seenByB.Card.Name}; A recibió card = null");
         Dispose(a, b);
     }
 

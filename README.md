@@ -44,15 +44,23 @@ Opciones del servidor: `--port 5000`, `--native-port 5001` (`0` = desactivar),
 
 ## Reglas
 
-1. Cada jugador empieza con **60 de vida** y una mano con **Dragón, Guerrero y Mago**.
-2. En tu turno haces **una** acción:
-   - **Sin criatura en mesa → jugar una carta** (tocándola o enseñándola a la cámara).
-     Sale de tu mano, entra en mesa y **ataca de inmediato**.
+1. Cada jugador usa un **mazo** (por defecto el inicial de `data/decks.json`: 2 Dragones, 2 Guerreros y
+   2 Magos). Al empezar se **baraja**, se reparten **3 cartas** y cada jugador tiene **90 de vida**.
+2. Al empezar tu turno **robas 1 carta** (el primer jugador no roba en su primer turno).
+3. En tu turno haces **una** acción:
+   - **Sin criatura en mesa → jugar una carta** de tu mano (tocándola o enseñándola a la cámara).
+     Entra en mesa y **ataca de inmediato**.
    - **Con criatura en mesa → atacar** con ella.
-3. El ataque golpea a la criatura rival; si la mata, **el daño sobrante pasa al jugador**.
+4. El ataque golpea a la criatura rival; si la mata, **el daño sobrante pasa al jugador**.
    Sin criatura rival, el golpe va directo al jugador. Las criaturas destruidas van al descarte.
-4. Pierdes si tu vida llega a 0, si empieza tu turno sin criatura ni cartas, o si te
-   desconectas más de 60 s durante la partida.
+5. Pierdes si tu vida llega a 0, si empiezas tu turno (tras robar) sin criatura ni cartas en la mano,
+   o si te desconectas más de 60 s durante la partida.
+
+**Información oculta:** del rival solo ves cuántas cartas tiene en mano y en mazo. Cuando robas, el
+evento `card_drawn` te dice qué carta es; al rival le llega `card: null`.
+
+**Mazos propios:** un cliente puede enviar `deck` en `join` (6–12 cartas, máximo 2 copias de cada una,
+cartas existentes); si no, se usa el mazo inicial. Los números están en `backend/game/rules.py` (`GameRules`).
 
 | Carta    | Vida | Ataque | Marcador ArUco |
 |----------|-----:|-------:|:--------------:|
@@ -63,12 +71,35 @@ Opciones del servidor: `--port 5000`, `--native-port 5001` (`0` = desactivar),
 Las partidas **siempre terminan**: no hay curación y cada turno hace ≥ 20 de daño
 (lo verifica un test con 200 partidas aleatorias).
 
+> Con cartas físicas, **el servidor decide qué robas** y la cámara solo confirma la carta que juegas
+> (validada contra tu mano). Un mazo físico barajado a mano no coincidiría con el del servidor.
+
 ### Equilibrio
 
-Medido con `tools/balance_report.py` (usa las reglas reales de `backend/game`):
+Medido con `tools/balance_report.py`, que usa las reglas reales de `backend/game` y simula partidas
+con barajado real:
 
-| Vida inicial | P1 gana (5000 partidas aleatorias) | Matriz 36 órdenes fijos | Partidas decididas por vida |
-|---:|---:|---:|---:|
+| Configuración | P1 gana (aleatorio vs aleatorio) | Decidido por vida | Experto vs aleatorio |
+|---|---:|---:|---:|
+| v2: sin mazo (3 cartas), vida 60 | 48 % | 32 % | — (juego "resuelto") |
+| Mazo de 6, vida 60 | 89 % | 90 % | |
+| Mazo de 6, vida 80 | 73 % | 52 % | |
+| **Mazo de 6, vida 90 (actual)** | **55 %** | **30 %** | **88 %** |
+| Mazo de 6, vida 100 | 39 % | 11 % | |
+
+- **Dos ventajas de asiento que se compensan.** Con vida baja decide el daño directo y el primer golpe
+  de P1 (que va a la cara) domina. Con vida alta decide el desgaste de criaturas y domina P2: quien
+  juega una criatura frente a otra ya en mesa le pega primero. Con 90, ambas se equilibran (~55/45,
+  habitual en juegos de cartas) y las dos formas de ganar aparecen.
+- **Las decisiones importan:** un jugador "experto" (simula cada opción sin ver la información oculta)
+  gana el ~88 % a uno aleatorio. Ninguna apertura domina (41–59 % de victorias).
+- **Ya no está "resuelto":** con azar e información oculta no hay una secuencia ganadora fija (en la v2,
+  con todo a la vista, el segundo jugador ganaba siempre con juego perfecto).
+- **Probado y descartado:** "primer turno sin ataque", "mareo de invocación", "contraataque",
+  robar en el primer turno y mano inicial de 2 (más equilibrada, 54 %, pero con menos decisiones).
+- `tests/test_balance.py` falla si un cambio de cartas, mazos o reglas rompe este equilibrio.
+
+---:|---:|---:|---:|
 | 100 (antes) | 16 % | P1 6 – P2 30 | 0 % |
 | 50 | 92 % | P1 33 – P2 3 | 75 % |
 | **60 (actual)** | **48 %** | **P1 17 – P2 19** | **32 %** |
@@ -94,12 +125,14 @@ Medido con `tools/balance_report.py` (usa las reglas reales de `backend/game`):
 ```
 card_ar_poc/
 ├── data/cards.json            # catálogo: ÚNICA fuente de verdad (servidor, cliente, Unity)
+├── data/decks.json            # mazos predefinidos ("starter")
 ├── backend/
 │   ├── app.py                 # transporte: Flask + Flask-SocketIO, HTTPS, desconexiones
 │   ├── protocol.py            # contrato de mensajes (sobre JSON versionado)
 │   ├── game/                  # reglas — Python puro, sin red ni OpenCV
 │   │   ├── cards.py           #   CardDefinition, CardCatalog, CardInstance
-│   │   ├── player.py          #   Player (vida, mano, criatura, descarte)
+│   │   ├── player.py          #   Player (vida, mazo, mano, criatura, descarte)
+│   │   ├── rules.py           #   GameRules (parámetros de equilibrio), validación de mazos
 │   │   └── game_manager.py    #   Game (turnos, combate, eventos), GameManager (salas)
 │   └── requirements.txt
 ├── client/                    # web móvil (HTML/CSS/JS sin frameworks)
@@ -137,7 +170,9 @@ card_ar_poc/
 | **`seq` monotónico, emitido bajo el lock de la partida** | Orden garantizado; el cliente descarta lo viejo. |
 | **`action_id` + `expected_turn`** | Acciones idempotentes: un doble toque o un reintento no juega dos veces. |
 | **`session_token` secreto emitido por el servidor** | Reconectar exige el token; el `player_id` es público. |
-| **Vista por jugador (`view(viewer_id)`)** | Información oculta: no ves la mano del rival. |
+| **Vista por jugador (`view(viewer_id)`)** | Información oculta: no ves la mano del rival ni ningún mazo (solo contadores). |
+| **Eventos por jugador (`events_for`)** | Un evento privado (la carta robada) se censura para los demás antes de enviarse. |
+| **Azar con semilla por partida** | Barajado reproducible en tests; la semilla nunca sale del servidor (permitiría predecir robos). |
 | **Visión en el servidor** | Un navegador no ejecuta OpenCV de Python. El móvil envía frames de 640 px. En Unity la detección pasará al dispositivo. |
 | **Detectar ≠ jugar** | `card_detected` propone; el jugador confirma `play_card`. Una carta que pasa por delante no se juega sola. |
 | **Control de flujo de frames** | Máx. 1 frame en vuelo, ~3 fps, y solo cuando puedes jugar carta. Sin colas ni latencia acumulada. |
@@ -158,7 +193,7 @@ Ambos transportes comparten sala: un jugador web puede jugar contra uno de Unity
 
 | Dirección | `type` | `payload` |
 |---|---|---|
-| C → S | `join` | `{name, session_token?, game_id?}` |
+| C → S | `join` | `{name, session_token?, game_id?, deck?}` — `deck`: lista de card_id |
 | C → S | `play_card` | `{card_id, expected_turn, source: "ui"\|"camera", target_id?}` + `action_id` |
 | C → S | `attack` | `{expected_turn, target_id?}` + `action_id` |
 | C → S | `rematch` · `sync` | `{}` |
@@ -169,7 +204,7 @@ Ambos transportes comparten sala: un jugador web puede jugar contra uno de Unity
 | S → C | `card_detected` | `{frame_id, marker_ids, cards}` — se responde a **todo** frame |
 | S → C | `error` + `action_id` | `{code, message}` — `code` estable (`not_your_turn`, `stale_action`…) |
 
-Eventos de juego: `player_joined`, `game_started`, `card_played`, `creature_damaged`,
+Eventos de juego: `player_joined`, `game_started`, `card_drawn` (privado: `card` es `null` para el rival), `card_played`, `creature_damaged`,
 `creature_destroyed`, `player_damaged`, `turn_changed`, `player_eliminated`, `game_over`,
 `player_disconnected`, `player_reconnected`, `player_left`, `rematch_requested`.
 
@@ -199,7 +234,7 @@ frame, OpenCV lee el `marker_id` y `data/cards.json` lo traduce a una carta.
 ## Pruebas
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v            # 45 tests
+.venv/bin/python -m unittest discover -s tests -v            # 56 tests
 .venv/bin/python tools/balance_report.py                     # informe de equilibrio
 .venv/bin/python tests/smoke_lan.py https://localhost:5000   # 2 clientes por red real
 dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws   # cliente C#
@@ -207,11 +242,11 @@ dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws
 
 | Archivo | Qué cubre |
 |---|---|
-| `test_game.py` | Reglas, turnos, `seq`, idempotencia, información oculta, revancha, abandono, terminación |
+| `test_game.py` | Reglas, turnos, `seq`, idempotencia, información oculta, revancha, abandono, terminación, mazos (reparto, barajado con semilla, robo privado, validación) |
 | `test_server.py` | Protocolo, difusión, errores con resync, reconexión con token, expiración por gracia |
 | `test_vision.py` | Detección con perspectiva, rotación, ruido, blur y JPEG; falsos positivos; latencia; extremo a extremo |
 | `test_ws_transport.py` | `/ws` real: JSON inválido, 2 nativos, partida mixta web + nativo, expiración |
-| `test_balance.py` | Equilibrio: ventaja de asiento, matriz de órdenes, vida relevante, ninguna apertura dominante |
+| `test_balance.py` | Equilibrio: ventaja de asiento, ambas formas de ganar, ninguna apertura dominante, las decisiones importan |
 | `smoke_lan.py` | Dos clientes por WebSocket + HTTPS reales |
 | `unity_client/dotnet/CardWars.Bots` | El código C# de Unity jugando partidas completas contra el servidor |
 
@@ -228,7 +263,7 @@ dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws
 - Las cartas impresas no llevan tildes (fuentes de OpenCV).
 - El servidor no puede verificar que la carta física existe: la defensa es validar contra la mano.
 - El puerto nativo (5001) va sin cifrar: aceptable en una LAN de pruebas, no en internet.
-- **Equilibrio:** ajustado (vida 60, ver *Reglas → Equilibrio*); con juego perfecto aún gana P2.
+- **Equilibrio:** ajustado con mazos (vida 90, P1 ~55 %; ver *Reglas → Equilibrio*).
 
 ---
 
@@ -244,6 +279,7 @@ Decidido: **servidor dedicado** (las reglas se quedan en Python; Unity es client
 | Modelos 3D | `model_key` del catálogo → Addressable/prefab; `MarkerDetection.corners` / pose de AR para anclarlo | Protocolo |
 | Animaciones | Cada evento (`creature_damaged`, `creature_destroyed`…) dispara una animación | Servidor |
 | Más jugadores | `max_players` + `target_id` (ya soportados por `Game`); UI de selección de objetivo | Protocolo |
-| Persistencia / mazos | `session_token` → token de cuenta; `Player.hand` se llena desde el mazo guardado | Reglas de combate |
+| Mazos | ✅ **Hecho** en el servidor: mazo por jugador (`join.deck`), barajado, robo, validación. Falta un editor de mazos en el cliente | Reglas de combate |
+| Persistencia | `session_token` → token de cuenta; mazos guardados por usuario en lugar de enviarlos en `join` | Reglas de combate |
 | Escala | Varias salas vía `GameManager`; si crece: Redis como message queue + sesiones pegadas | Reglas |
 | Paridad de reglas | Si algún día se portan a C# (host en móvil): casos de prueba JSON compartidos | — |

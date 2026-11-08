@@ -114,7 +114,8 @@ class GameServer:
             sid = self.player_sids.get((game.game_id, p.player_id))
             if sid:
                 self.send(sid, "state_update",
-                          {"events": update.events, "state": game.view(p.player_id)},
+                          {"events": game.events_for(update.events, p.player_id),
+                           "state": game.view(p.player_id)},
                           seq=update.seq)
 
     def send_sync(self, sid: str, game: Game, player_id: str) -> None:
@@ -155,9 +156,10 @@ class GameServer:
         name = optional(msg.payload, "name", str) or ""
         token = optional(msg.payload, "session_token", str)
         game_id = (optional(msg.payload, "game_id", str) or "default")[:32]
+        deck = optional(msg.payload, "deck", list)   # el juego valida el contenido
         game = self.manager.get_or_create(game_id)
         with game.lock:
-            player, update = game.join(name, token)
+            player, update = game.join(name, token, deck)
             key = (game_id, player.player_id)
             with self._lock:
                 old_sid = self.player_sids.get(key)
@@ -281,14 +283,15 @@ class GameServer:
         log.info("jugador %s expirado tras %ss desconectado", key[1], self.grace_seconds)
 
 
-def create_app(grace_seconds: float = DISCONNECT_GRACE_SECONDS, detector="auto"):
+def create_app(grace_seconds: float = DISCONNECT_GRACE_SECONDS, detector="auto", rules=None):
+    """`rules`: GameRules para las partidas (tests); por defecto, las del juego."""
     app = Flask(__name__, static_folder=None)
     socketio = SocketIO(app, async_mode="threading", max_http_buffer_size=2 * MAX_FRAME_BYTES)
     if detector == "auto":
         detector, error = load_detector()
         if error:
             log.warning("Visión desactivada: %s", error)
-    server = GameServer(socketio, GameManager(), detector, grace_seconds)
+    server = GameServer(socketio, GameManager(rules=rules), detector, grace_seconds)
 
     # WebSocket puro para clientes nativos. ping_interval detecta móviles dormidos.
     app.config["SOCK_SERVER_OPTIONS"] = {"ping_interval": 20,

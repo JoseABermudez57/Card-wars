@@ -88,7 +88,7 @@ namespace CardWars.Core
         /// <summary>Conecta y entra en la partida. Si hay token guardado para este
         /// servidor, el servidor nos devuelve nuestro puesto (reconexión).</summary>
         public async Task ConnectAsync(Uri serverUri, string playerName, string gameId = null,
-                                       CancellationToken ct = default)
+                                       CancellationToken ct = default, IList<string> deck = null)
         {
             _serverKey = serverUri.GetLeftPart(UriPartial.Authority);
             GameId = gameId;
@@ -98,6 +98,7 @@ namespace CardWars.Core
                 Name = playerName,
                 SessionToken = _sessions.LoadToken(_serverKey),
                 GameId = gameId,
+                Deck = deck != null ? new List<string>(deck) : null,
             }, null, ct);
         }
 

@@ -20,6 +20,12 @@ try:
 except ImportError:
     simple_websocket = None
 
+from game.rules import GameRules  # noqa: E402
+
+ONE_OF_EACH = ["dragon", "warrior", "mage"]
+# Reglas "clásicas": mazo de 3, todo en la mano, nada que robar (determinista).
+CLASSIC = GameRules(initial_hand=3, deck_min=3)
+
 
 def msg(type_, payload=None, action_id=None):
     m = {"v": 1, "type": type_, "payload": payload or {}}
@@ -51,7 +57,7 @@ class WsPlayer:
 @unittest.skipIf(simple_websocket is None, "dependencias del servidor no instaladas")
 class WsTransportTests(unittest.TestCase):
     def setUp(self):
-        self.app, self.socketio, self.server = create_app(grace_seconds=0.3, detector=None)
+        self.app, self.socketio, self.server = create_app(grace_seconds=0.3, detector=None, rules=CLASSIC)
         self.http = make_server("127.0.0.1", 0, self.app, threaded=True)
         self.port = self.http.server_port
         threading.Thread(target=self.http.serve_forever, daemon=True).start()
@@ -68,9 +74,9 @@ class WsTransportTests(unittest.TestCase):
 
     def test_two_native_players(self):
         a, b = WsPlayer(self.ws_url), WsPlayer(self.ws_url)
-        a.send(msg("join", {"name": "A"}))
+        a.send(msg("join", {"name": "A", "deck": ONE_OF_EACH}))
         wa = a.recv_until("welcome")["payload"]
-        b.send(msg("join", {"name": "B"}))
+        b.send(msg("join", {"name": "B", "deck": ONE_OF_EACH}))
         b.recv_until("welcome")
         a.send(msg("play_card", {"card_id": "mage", "expected_turn": 1}, "x1"))
         while True:
@@ -89,14 +95,14 @@ class WsTransportTests(unittest.TestCase):
         web_msgs = []
         web.on("msg", web_msgs.append)
         web.connect(f"http://127.0.0.1:{self.port}", transports=["websocket"])
-        web.emit("msg", msg("join", {"name": "Web"}))
+        web.emit("msg", msg("join", {"name": "Web", "deck": ONE_OF_EACH}))
         for _ in range(30):                      # garantizar que el web entra primero
             if any(m["type"] == "welcome" for m in web_msgs):
                 break
             web.sleep(0.1)
 
         native = WsPlayer(self.ws_url)
-        native.send(msg("join", {"name": "Unity"}))
+        native.send(msg("join", {"name": "Unity", "deck": ONE_OF_EACH}))
         native.recv_until("welcome")
         native.recv_until("state_update")      # game_started
 
@@ -116,9 +122,9 @@ class WsTransportTests(unittest.TestCase):
 
     def test_native_disconnect_expires_seat(self):
         a, b = WsPlayer(self.ws_url), WsPlayer(self.ws_url)
-        a.send(msg("join", {"name": "A"}))
+        a.send(msg("join", {"name": "A", "deck": ONE_OF_EACH}))
         a.recv_until("welcome")
-        b.send(msg("join", {"name": "B"}))
+        b.send(msg("join", {"name": "B", "deck": ONE_OF_EACH}))
         b.recv_until("welcome")
         a.close()
         while True:

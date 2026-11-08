@@ -12,6 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from game.cards import default_catalog  # noqa: E402
 from game.game_manager import DuplicateActionError, Game, GameError, GameStatus  # noqa: E402
 from game.player import STARTING_LIFE  # noqa: E402
+from game.rules import DEFAULT_RULES, GameRules, starter_deck  # noqa: E402
+
+ONE_OF_EACH = ["dragon", "warrior", "mage"]
+# Reglas "clásicas" para tests de combate: mazo de 3 cartas, todo en la mano
+# y nada que robar => partidas deterministas sin azar.
+CLASSIC = GameRules(initial_hand=3, deck_min=3)
 
 
 def types(update):
@@ -20,9 +26,9 @@ def types(update):
 
 class GameTestCase(unittest.TestCase):
     def setUp(self):
-        self.game = Game()
-        self.p1, _ = self.game.join("Ana")
-        self.p2, self.start_update = self.game.join("Luis")
+        self.game = Game(rules=CLASSIC, seed=1)
+        self.p1, _ = self.game.join("Ana", deck=ONE_OF_EACH)
+        self.p2, self.start_update = self.game.join("Luis", deck=ONE_OF_EACH)
 
     def turn(self):
         return self.game.turn_number
@@ -33,7 +39,7 @@ class LobbyTests(GameTestCase):
         self.assertIn("game_started", types(self.start_update))
         self.assertEqual(self.game.status, GameStatus.IN_PROGRESS)
         self.assertIs(self.game.current_player, self.p1)
-        self.assertEqual(self.p1.hand, ["dragon", "warrior", "mage"])
+        self.assertEqual(sorted(self.p1.hand), sorted(ONE_OF_EACH))
 
     def test_full_game_rejects_third_player(self):
         with self.assertRaises(GameError) as ctx:
@@ -81,6 +87,8 @@ class SyncTests(GameTestCase):
         self.assertIn("hand", me)
         self.assertNotIn("hand", rival)
         self.assertEqual(rival["hand_count"], 3)
+        self.assertEqual(rival["deck_count"], 0)
+        self.assertNotIn("deck", rival)
         self.assertNotIn("session_token", str(view))
 
 
@@ -145,11 +153,11 @@ class CombatTests(GameTestCase):
     def test_random_games_always_terminate(self):
         """Regresión del bug de reglas v1 (partidas infinitas)."""
         rng = random.Random(42)
-        for _ in range(200):
-            g = Game()
+        for i in range(200):
+            g = Game(seed=i)              # reglas por defecto: mazos barajados y robos
             a, _ = g.join("A")
             g.join("B")
-            for _turn in range(200):
+            for _turn in range(500):
                 if g.status == GameStatus.FINISHED:
                     break
                 p = g.current_player
@@ -158,6 +166,93 @@ class CombatTests(GameTestCase):
                 else:
                     g.play_card(p.player_id, rng.choice(p.hand))
             self.assertEqual(g.status, GameStatus.FINISHED)
+
+
+class DeckTests(unittest.TestCase):
+    """Mazos, barajado, robo e información oculta (reglas por defecto)."""
+
+    def new_game(self, seed=1, rules=DEFAULT_RULES, decks=(None, None)):
+        g = Game(rules=rules, seed=seed)
+        a, _ = g.join("A", deck=decks[0])
+        b, start = g.join("B", deck=decks[1])
+        return g, a, b, start
+
+    def test_default_deck_is_dealt(self):
+        g, a, b, _ = self.new_game()
+        for p in (a, b):
+            self.assertEqual(len(p.hand), DEFAULT_RULES.initial_hand)
+            self.assertEqual(len(p.deck), len(starter_deck()) - DEFAULT_RULES.initial_hand)
+            self.assertEqual(sorted(p.hand + p.deck), sorted(starter_deck()))
+
+    def test_shuffle_is_deterministic_with_seed_and_varies_without(self):
+        hands = lambda seed: [p.hand for p in self.new_game(seed)[1:3]]  # noqa: E731
+        self.assertEqual(hands(5), hands(5))
+        self.assertGreater(len({str(hands(s)) for s in range(20)}), 5)
+
+    def test_draw_at_start_of_turn_is_private(self):
+        g, a, b, _ = self.new_game()
+        before = (len(b.hand), len(b.deck))
+        update = g.play_card(a.player_id, a.hand[0])
+        drawn = [e for e in update.events if e["type"] == "card_drawn"]
+        self.assertEqual(len(drawn), 1)
+        self.assertEqual((len(b.hand), len(b.deck)), (before[0] + 1, before[1] - 1))
+        mine = Game.events_for(update.events, b.player_id)
+        theirs = Game.events_for(update.events, a.player_id)
+        card_b = next(e for e in mine if e["type"] == "card_drawn")["payload"]["card"]
+        card_a = next(e for e in theirs if e["type"] == "card_drawn")["payload"]["card"]
+        self.assertEqual(card_b["card_id"], b.hand[-1])
+        self.assertIsNone(card_a)                      # el rival no ve qué robaste
+        for ev in mine + theirs:
+            self.assertNotIn("_private_to", ev)        # la marca interna no sale
+
+    def test_first_player_does_not_draw_on_turn_one(self):
+        g, a, _, start = self.new_game()
+        self.assertNotIn("card_drawn", types(start))
+        self.assertEqual(len(a.hand), DEFAULT_RULES.initial_hand)
+
+    def test_first_turn_attack_can_be_disabled(self):
+        rules = GameRules(first_turn_attack=False)
+        g, a, b, _ = self.new_game(rules=rules)
+        update = g.play_card(a.player_id, a.hand[0])
+        self.assertNotIn("player_damaged", types(update))
+        self.assertEqual(b.life, rules.starting_life)
+
+    def test_custom_deck_and_validation(self):
+        deck = ["mage", "mage", "dragon", "dragon", "warrior", "warrior"]
+        g, a, _, _ = self.new_game(decks=(deck, None))
+        self.assertEqual(sorted(a.hand + a.deck), sorted(deck))
+        bad = {
+            "pequeño": ["mage", "dragon"],
+            "copias": ["mage", "mage", "mage", "dragon", "dragon", "warrior"],
+            "desconocida": ["mage", "mage", "dragon", "dragon", "warrior", "unicornio"],
+        }
+        for label, deck in bad.items():
+            with self.subTest(label), self.assertRaises(GameError) as ctx:
+                Game().join("X", deck=deck)
+            self.assertEqual(ctx.exception.code, "invalid_deck")
+
+    def test_lose_when_hand_and_deck_are_empty(self):
+        g, a, b, _ = self.new_game()
+        b.hand.clear()
+        b.deck.clear()
+        update = g.play_card(a.player_id, a.hand[0])
+        self.assertEqual(types(update)[-2:], ["player_eliminated", "game_over"])
+
+    def test_empty_hand_but_cards_in_deck_keeps_playing(self):
+        g, a, b, _ = self.new_game()
+        b.hand.clear()                                 # le queda mazo: roba y sigue
+        update = g.play_card(a.player_id, a.hand[0])
+        self.assertIn("turn_changed", types(update))
+        self.assertEqual(len(b.hand), 1)
+
+    def test_rematch_reshuffles_full_deck(self):
+        g, a, b, _ = self.new_game()
+        g.forfeit(b.player_id)
+        g.request_rematch(a.player_id)
+        g.request_rematch(b.player_id)
+        for p in (a, b):
+            self.assertEqual(sorted(p.hand + p.deck), sorted(starter_deck()))
+            self.assertEqual(p.discard, [])
 
 
 class LifecycleTests(GameTestCase):

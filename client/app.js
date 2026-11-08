@@ -232,7 +232,7 @@ function renderPlayer(el, p, isMe) {
       <span class="life-num">❤️ ${p.life}/${p.max_life ?? "?"}</span>
     </div>
     <div class="field">${creature ? creatureHtml(creature) : '<div class="slot-empty">Sin criatura</div>'}</div>
-    <div class="meta">🂠 ${p.hand_count} en mano · 🪦 ${p.discard.length} descartadas</div>`;
+    <div class="meta">🂠 ${p.hand_count} en mano · 📚 ${p.deck_count ?? 0} en mazo · 🪦 ${p.discard.length} descartadas</div>`;
 }
 
 function renderHand(my) {
@@ -303,6 +303,10 @@ function describe(ev, prev, next) {
     case "player_reconnected": return `📶 ${name(e.player_id)} volvió`;
     case "player_left": return `🚪 ${name(e.player_id)} salió`;
     case "rematch_requested": return `🔁 ${name(e.player_id)} quiere revancha`;
+    // La carta solo viene para quien roba; el rival recibe card: null.
+    case "card_drawn": return e.card
+      ? `🃏 Robas ${escapeHtml(e.card.name)} (quedan ${e.deck_count} en el mazo)`
+      : `🃏 ${name(e.player_id)} roba una carta`;
     default: return null;
   }
 }

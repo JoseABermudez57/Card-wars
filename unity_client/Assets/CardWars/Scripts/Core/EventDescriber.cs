@@ -84,6 +84,13 @@ namespace CardWars.Core
                     return $"{PlayerName(ev.PayloadAs<PlayerRefEvent>().PlayerId)} volvió";
                 case GameEventType.PlayerLeft:
                     return $"{PlayerName(ev.PayloadAs<PlayerRefEvent>().PlayerId)} salió";
+                case GameEventType.CardDrawn:
+                {
+                    var e = ev.PayloadAs<CardDrawnEvent>();
+                    return e.Card != null
+                        ? $"{PlayerName(e.PlayerId)} roba {e.Card.Name} (quedan {e.DeckCount} en el mazo)"
+                        : $"{PlayerName(e.PlayerId)} roba una carta";
+                }
                 case GameEventType.RematchRequested:
                     return $"{PlayerName(ev.PayloadAs<PlayerRefEvent>().PlayerId)} quiere revancha";
                 default:

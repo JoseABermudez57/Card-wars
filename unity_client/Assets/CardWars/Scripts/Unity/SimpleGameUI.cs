@@ -86,6 +86,12 @@ namespace CardWars.UnityClient
             }
 
             GUILayout.Label(StatusText(game, state), RichLabel(18));
+            if (_compact && game.Me != null)
+            {
+                var rival = game.Rival;
+                GUILayout.Label($"Tú: mano {game.Me.HandCount} · mazo {game.Me.DeckCount}" +
+                                (rival != null ? $"   Rival: mano {rival.HandCount} · mazo {rival.DeckCount}" : ""));
+            }
             if (!_compact)
             {
                 DrawPlayer("Rival", game.Rival, state);
@@ -171,7 +177,7 @@ namespace CardWars.UnityClient
                 var turn = state.CurrentPlayerId == player.PlayerId ? "  <color=yellow>[turno]</color>" : "";
                 var offline = player.Connected ? "" : "  <color=red>[desconectado]</color>";
                 GUILayout.Label($"<b>{title}: {player.Name}</b>{turn}{offline}", RichLabel(16));
-                GUILayout.Label($"Vida: {player.Life}/{player.MaxLife}   Mano: {player.HandCount}   Descarte: {player.Discard?.Count ?? 0}");
+                GUILayout.Label($"Vida: {player.Life}/{player.MaxLife}   Mano: {player.HandCount}   Mazo: {player.DeckCount}   Descarte: {player.Discard?.Count ?? 0}");
                 var c = player.Creature;
                 GUILayout.Label(c == null ? "Mesa: (vacía)" : $"Mesa: {c.Name}  ATK {c.Attack}  HP {c.Hp}/{c.MaxHp}");
             }

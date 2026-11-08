@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "decks": {
+    "starter": ["dragon", "dragon", "warrior", "warrior", "mage", "mage"]
+  }
+}

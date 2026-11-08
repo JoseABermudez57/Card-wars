@@ -55,13 +55,15 @@ for p in (a, b):
     p.wait()
 
 turn = a.state["turn_number"]
+card = next(p for p in a.state["players"] if "hand" in p)["hand"][0]   # una carta de MI mano
+attack = next(c for c in a.welcome["catalog"]["cards"] if c["card_id"] == card)["attack"]
 b.got.clear()
-a.send("play_card", {"card_id": "mage", "expected_turn": turn, "source": "ui"}, action=True)
+a.send("play_card", {"card_id": card, "expected_turn": turn, "source": "ui"}, action=True)
 b.wait()
 start = b.state["players"][0]["max_life"]
 lives = {p["name"]: p["life"] for p in b.state["players"]}
-print("Vidas vistas por B:", lives)
-assert lives == {"A": start, "B": start - 40}, lives
+print(f"A juega {card} (ataque {attack}). Vidas vistas por B:", lives)
+assert lives == {"A": start, "B": start - attack}, lives
 for p in (a, b):
     p.sio.disconnect()
 print("OK: evento en tiempo real recibido por el otro jugador")
