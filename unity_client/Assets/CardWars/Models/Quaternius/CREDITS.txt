@@ -1,0 +1,12 @@
+Modelos 3D de criaturas — Quaternius (https://quaternius.com)
+Licencia: CC0 1.0 Universal (dominio público)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+- Dragon.fbx   <- "Animated Monster Pack" (Animated Monsters by Quaternius)
+                  https://opengameart.org/content/lowpoly-animated-monsters
+- Warrior.fbx, Wizard.fbx y Textures/ <- "RPG Characters - Nov 2020" (LowPoly Models by @Quaternius)
+                  https://opengameart.org/content/lowpoly-rpg-characters
+
+Descargados de OpenGameArt, donde ambos packs figuran como CC0; el License.txt
+incluido en cada zip también indica CC0 1.0. No se exige atribución; se
+mantiene por cortesía. Apoyo al autor: https://www.patreon.com/quaternius

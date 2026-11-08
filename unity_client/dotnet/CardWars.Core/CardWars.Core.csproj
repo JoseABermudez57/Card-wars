@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compila los MISMOS archivos que usa Unity (Assets/CardWars/Scripts/Core) con
+    las restricciones de Unity: API .NET Standard 2.1 y C# 9. Si compila aquí,
+    compila en Unity 2021.3+ / Unity 6.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/CardWars/Scripts/Core/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- En Unity: paquete com.unity.nuget.newtonsoft-json (misma API 13.x) -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

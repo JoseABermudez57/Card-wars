@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1527bc9937401ab2699e63a81e89292f, type: 3}
+  m_Name: CreaturePrefabRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::CardWars.Presentation.CreaturePrefabRegistry
+  entries:
+  - modelKey: dragon
+    prefab: {fileID: 919132149155446097, guid: a3b5e92d55c8fa83196e8eefbf6df44e, type: 3}
+    height: 2
+    maxWidth: 2.6
+    yawOffset: 0
+    idle: {fileID: 6715004902463417496, guid: a3b5e92d55c8fa83196e8eefbf6df44e, type: 3}
+    attack: {fileID: -8721722018038115971, guid: a3b5e92d55c8fa83196e8eefbf6df44e, type: 3}
+    hit: {fileID: -3693655769034393273, guid: a3b5e92d55c8fa83196e8eefbf6df44e, type: 3}
+    death: {fileID: 1396291781994451658, guid: a3b5e92d55c8fa83196e8eefbf6df44e, type: 3}
+  - modelKey: warrior
+    prefab: {fileID: 919132149155446097, guid: d17ae1742ca169c919083cfc7a20875e, type: 3}
+    height: 1.9
+    maxWidth: 2.2
+    yawOffset: 0
+    idle: {fileID: 6730081373776484235, guid: d17ae1742ca169c919083cfc7a20875e, type: 3}
+    attack: {fileID: -1108164523259347411, guid: d17ae1742ca169c919083cfc7a20875e, type: 3}
+    hit: {fileID: -4856542728082765067, guid: d17ae1742ca169c919083cfc7a20875e, type: 3}
+    death: {fileID: 4447012609936615250, guid: d17ae1742ca169c919083cfc7a20875e, type: 3}
+  - modelKey: mage
+    prefab: {fileID: 919132149155446097, guid: a577ce75f67308b7681f298a9c3badd8, type: 3}
+    height: 1.9
+    maxWidth: 2.2
+    yawOffset: 0
+    idle: {fileID: 6730081373776484235, guid: a577ce75f67308b7681f298a9c3badd8, type: 3}
+    attack: {fileID: 5649889755142943411, guid: a577ce75f67308b7681f298a9c3badd8, type: 3}
+    hit: {fileID: -4856542728082765067, guid: a577ce75f67308b7681f298a9c3badd8, type: 3}
+    death: {fileID: 4447012609936615250, guid: a577ce75f67308b7681f298a9c3badd8, type: 3}

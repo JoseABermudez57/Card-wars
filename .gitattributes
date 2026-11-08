@@ -1,0 +1,20 @@
+# Fin de línea normalizado para texto (el proyecto se edita en Linux).
+* text=auto eol=lf
+
+# Archivos YAML de Unity (Force Text): diffs legibles, sin conversión rara.
+*.unity        text eol=lf
+*.prefab       text eol=lf
+*.asset        text eol=lf
+*.mat          text eol=lf
+*.meta         text eol=lf
+*.controller   text eol=lf
+*.anim         text eol=lf
+*.inputactions text eol=lf
+
+# Binarios: sin diffs ni conversiones.
+*.fbx  binary
+*.png  binary
+*.jpg  binary
+*.blend binary
+*.ttf  binary
+*.otf  binary

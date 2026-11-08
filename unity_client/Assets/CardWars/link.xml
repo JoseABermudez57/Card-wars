@@ -1,0 +1,9 @@
+<!--
+  IL2CPP (Android/iOS) elimina código que "no se usa". Los DTO del protocolo solo
+  se crean por reflexión (Newtonsoft), así que se preservan explícitamente.
+-->
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <namespace fullname="CardWars.Core" preserve="all"/>
+  </assembly>
+</linker>

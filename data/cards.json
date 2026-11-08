@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "cards": [
+    {"card_id": "dragon",  "name": "Dragón",   "max_hp": 100, "attack": 30, "marker_id": 0, "model_key": "dragon"},
+    {"card_id": "warrior", "name": "Guerrero", "max_hp": 120, "attack": 20, "marker_id": 1, "model_key": "warrior"},
+    {"card_id": "mage",    "name": "Mago",     "max_hp": 80,  "attack": 40, "marker_id": 2, "model_key": "mage"}
+  ]
+}

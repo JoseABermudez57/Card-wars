@@ -1,0 +1,50 @@
+# ---------------------------------------------------------------- Python
+.venv/
+__pycache__/
+*.pyc
+
+# Certificado HTTPS autofirmado: contiene la CLAVE PRIVADA. Nunca al repo.
+backend/certs/
+
+# Generado por `python -m vision.card_detector generate`
+printables/
+
+# ---------------------------------------------------------------- Unity (unity_client/)
+# Todo esto lo regenera Unity al abrir el proyecto.
+/unity_client/[Ll]ibrary/
+/unity_client/[Tt]emp/
+/unity_client/[Oo]bj/
+/unity_client/[Ll]ogs/
+/unity_client/[Uu]ser[Ss]ettings/
+/unity_client/[Bb]uild/
+/unity_client/[Bb]uilds/
+/unity_client/[Mm]emoryCaptures/
+/unity_client/[Rr]ecordings/
+
+# Proyectos de IDE que genera Unity en la raíz del proyecto
+# (los .csproj de unity_client/dotnet/ SÍ se versionan).
+/unity_client/*.csproj
+/unity_client/*.sln
+/unity_client/*.slnx
+/unity_client/.vs/
+/unity_client/.idea/
+/unity_client/.vscode/
+*.pidb
+*.userprefs
+*.unityproj
+sysinfo.txt
+crashlytics-buildid.txt
+
+# Builds de móvil
+*.apk
+*.aab
+*.ipa
+
+# ---------------------------------------------------------------- .NET (bots y núcleo C#)
+unity_client/dotnet/**/bin/
+unity_client/dotnet/**/obj/
+
+# ---------------------------------------------------------------- Sistema / editores
+.DS_Store
+Thumbs.db
+*.swp

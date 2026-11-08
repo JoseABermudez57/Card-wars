@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14161f">
+  <title>Card Wars POC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <span id="conn-dot" class="dot" title="Conexión"></span>
+    <span id="status-text">Conectando…</span>
+  </header>
+
+  <main id="game" hidden>
+    <section id="rival-panel" class="player-panel rival" aria-label="Rival"></section>
+
+    <section id="battle-log" class="log" aria-live="polite"></section>
+
+    <section id="me-panel" class="player-panel me" aria-label="Tú"></section>
+
+    <section class="controls">
+      <button id="attack-btn" class="btn primary" hidden>⚔️ Atacar</button>
+      <p id="turn-hint" class="hint"></p>
+    </section>
+
+    <section aria-label="Tu mano">
+      <h2 class="section-title">Tu mano</h2>
+      <div id="hand" class="hand"></div>
+    </section>
+
+    <section class="camera" aria-label="Cámara">
+      <div class="camera-head">
+        <button id="camera-btn" class="btn">📷 Cámara en vivo</button>
+        <label id="photo-btn" class="btn ghost">🖼️ Foto
+          <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+        </label>
+      </div>
+      <div class="video-wrap">
+        <video id="video" playsinline muted hidden></video>
+        <div id="detection" class="detection" hidden></div>
+      </div>
+      <p id="camera-hint" class="hint"></p>
+    </section>
+  </main>
+
+  <div id="join-screen" class="overlay" hidden>
+    <form id="join-form" class="dialog">
+      <h1>Card Wars <small>POC</small></h1>
+      <label for="name-input">Tu nombre</label>
+      <input id="name-input" maxlength="20" autocomplete="nickname" required placeholder="Ej. Ana">
+      <button class="btn primary" type="submit">Entrar a la partida</button>
+      <p id="join-error" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="gameover-screen" class="overlay" hidden>
+    <div class="dialog">
+      <h1 id="gameover-title"></h1>
+      <p id="gameover-reason"></p>
+      <button id="rematch-btn" class="btn primary">🔁 Revancha</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="vendor/socket.io.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Servidor
+Flask>=3.0
+Flask-SocketIO>=5.3
+simple-websocket>=1.0      # WebSocket real en async_mode="threading" (sin eventlet)
+flask-sock>=0.7            # endpoint /ws de WebSocket puro para Unity
+cryptography>=42           # certificado HTTPS autofirmado (cámara en el móvil)
+
+# Visión (módulo vision/). ArUco viene incluido en opencv-python >= 4.7
+opencv-python>=4.8
+numpy>=1.26
+
+# Solo pruebas: cliente Socket.IO de Python para el smoke test por red
+python-socketio[client]>=5.11
