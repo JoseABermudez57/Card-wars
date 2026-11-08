@@ -44,7 +44,7 @@ Opciones del servidor: `--port 5000`, `--native-port 5001` (`0` = desactivar),
 
 ## Reglas
 
-1. Cada jugador empieza con **100 de vida** y una mano con **Dragón, Guerrero y Mago**.
+1. Cada jugador empieza con **60 de vida** y una mano con **Dragón, Guerrero y Mago**.
 2. En tu turno haces **una** acción:
    - **Sin criatura en mesa → jugar una carta** (tocándola o enseñándola a la cámara).
      Sale de tu mano, entra en mesa y **ataca de inmediato**.
@@ -62,6 +62,30 @@ Opciones del servidor: `--port 5000`, `--native-port 5001` (`0` = desactivar),
 
 Las partidas **siempre terminan**: no hay curación y cada turno hace ≥ 20 de daño
 (lo verifica un test con 200 partidas aleatorias).
+
+### Equilibrio
+
+Medido con `tools/balance_report.py` (usa las reglas reales de `backend/game`):
+
+| Vida inicial | P1 gana (5000 partidas aleatorias) | Matriz 36 órdenes fijos | Partidas decididas por vida |
+|---:|---:|---:|---:|
+| 100 (antes) | 16 % | P1 6 – P2 30 | 0 % |
+| 50 | 92 % | P1 33 – P2 3 | 75 % |
+| **60 (actual)** | **48 %** | **P1 17 – P2 19** | **32 %** |
+| 70 | 23 % | P1 8 – P2 28 | 6 % |
+
+- **Causa del desequilibrio original:** con 100 de vida, el daño al jugador nunca decidía nada (todas las
+  partidas acababan por "sin criaturas"). Era una guerra de desgaste entre criaturas, y quien juega una criatura
+  frente a otra ya en mesa le pega primero: P2 lo conseguía en su primer turno; el primer golpe de P1 iba a la
+  cara y no servía.
+- **Se probaron** "primer turno sin ataque" (no cambia nada), "mareo de invocación" (P1 64 %) y
+  "contraataque del defensor" (P1 70 %): o no corrigen o se pasan. Bajar la vida a 60 equilibra sin reglas
+  nuevas y hace que el daño directo importe. Como los daños son múltiplos de 10, la vida solo tiene saltos de 10.
+- **Decisiones con peso:** abrir con Guerrero es fuerte (~58–69 % de victorias), con Mago arriesgado
+  (~36–47 %); ninguna apertura gana siempre.
+- **Límite conocido:** con información completa y 3 cartas, el juego está "resuelto" (con juego perfecto gana P2).
+  Para que deje de estarlo hace falta azar o información oculta (mazos barajados, robar cartas).
+- `tests/test_balance.py` falla si un cambio de cartas o reglas rompe este equilibrio.
 
 ---
 
@@ -84,7 +108,8 @@ card_ar_poc/
 ├── unity_client/              # cliente Unity mínimo (C#) + bots de prueba con dotnet
 ├── vision/card_detector.py    # imagen -> marker_ids; generador de cartas; prueba webcam
 ├── printables/                # (generado) cartas PNG para imprimir
-└── tests/                     # unitarios, integración, visión y smoke test por red
+├── tests/                     # unitarios, integración, visión, equilibrio y smoke test por red
+└── tools/balance_report.py    # informe de equilibrio (matriz, minimax, Monte Carlo)
 ```
 
 ---
@@ -174,7 +199,8 @@ frame, OpenCV lee el `marker_id` y `data/cards.json` lo traduce a una carta.
 ## Pruebas
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v            # 41 tests
+.venv/bin/python -m unittest discover -s tests -v            # 45 tests
+.venv/bin/python tools/balance_report.py                     # informe de equilibrio
 .venv/bin/python tests/smoke_lan.py https://localhost:5000   # 2 clientes por red real
 dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws   # cliente C#
 ```
@@ -185,6 +211,7 @@ dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws
 | `test_server.py` | Protocolo, difusión, errores con resync, reconexión con token, expiración por gracia |
 | `test_vision.py` | Detección con perspectiva, rotación, ruido, blur y JPEG; falsos positivos; latencia; extremo a extremo |
 | `test_ws_transport.py` | `/ws` real: JSON inválido, 2 nativos, partida mixta web + nativo, expiración |
+| `test_balance.py` | Equilibrio: ventaja de asiento, matriz de órdenes, vida relevante, ninguna apertura dominante |
 | `smoke_lan.py` | Dos clientes por WebSocket + HTTPS reales |
 | `unity_client/dotnet/CardWars.Bots` | El código C# de Unity jugando partidas completas contra el servidor |
 
@@ -201,8 +228,7 @@ dotnet run --project unity_client/dotnet/CardWars.Bots -- ws://localhost:5001/ws
 - Las cartas impresas no llevan tildes (fuentes de OpenCV).
 - El servidor no puede verificar que la carta física existe: la defensa es validar contra la mano.
 - El puerto nativo (5001) va sin cifrar: aceptable en una LAN de pruebas, no en internet.
-- **Equilibrio:** en partidas aleatorias de bots, el segundo jugador ganó 9 de 10. Las reglas
-  favorecen a quien juega segundo (pendiente de ajustar: p. ej. que el primer turno no ataque).
+- **Equilibrio:** ajustado (vida 60, ver *Reglas → Equilibrio*); con juego perfecto aún gana P2.
 
 ---
 

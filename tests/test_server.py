@@ -81,7 +81,8 @@ class ServerTests(unittest.TestCase):
         self.assertEqual([e["type"] for e in ub["payload"]["events"]],
                          ["card_played", "player_damaged", "turn_changed"])
         rival_view = {p["player_id"]: p for p in ub["payload"]["state"]["players"]}
-        self.assertEqual(rival_view[wb["player_id"]]["life"], 60)
+        start = rival_view[wb["player_id"]]["max_life"]
+        self.assertEqual(rival_view[wb["player_id"]]["life"], start - 40)
         self.assertNotIn("hand", rival_view[wa["player_id"]])   # B no ve la mano de A
 
     def test_error_goes_only_to_sender_with_resync(self):

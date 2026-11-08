@@ -9,7 +9,8 @@ namespace CardWars.Presentation
     /// </summary>
     public class PlayerAvatarView : MonoBehaviour
     {
-        public const int MaxLife = 100;
+        /// <summary>Solo si el servidor no envía max_life (versiones antiguas).</summary>
+        public const int DefaultMaxLife = 100;
 
         private readonly List<Material> _materials = new List<Material>();
         private Bar _bar;
@@ -24,7 +25,8 @@ namespace CardWars.Presentation
 
         public string PlayerId { get; private set; }
         public string DisplayName { get; private set; } = "";
-        public int Life { get; private set; } = MaxLife;
+        public int Life { get; private set; } = DefaultMaxLife;
+        public int MaxLife { get; private set; } = DefaultMaxLife;
         public bool Connected { get; private set; } = true;
         public bool HasPlayer => PlayerId != null;
 
@@ -61,12 +63,13 @@ namespace CardWars.Presentation
                                             new Vector3(1.5f, 0.01f, 1.5f), Vector3.zero,
                                             CreatureVisuals.Mat(new Color(0.25f, 0.25f, 0.3f), _materials));
             _ringRenderer = ring.GetComponent<Renderer>();
-            Show(null, null, MaxLife, true);
+            Show(null, null, DefaultMaxLife, DefaultMaxLife, true);
         }
 
-        public void Show(string playerId, string displayName, int life, bool connected)
+        public void Show(string playerId, string displayName, int life, int maxLife, bool connected)
         {
             PlayerId = playerId;
+            MaxLife = maxLife > 0 ? maxLife : DefaultMaxLife;
             DisplayName = displayName ?? "";
             Connected = connected;
             SetLife(life);
@@ -77,7 +80,7 @@ namespace CardWars.Presentation
         public void SetLife(int life)
         {
             Life = Mathf.Max(0, life);
-            _bar.Set(Life / (float)MaxLife);
+            _bar.Set(Life / (float)Mathf.Max(1, MaxLife));
         }
 
         public void SetActiveTurn(bool active)

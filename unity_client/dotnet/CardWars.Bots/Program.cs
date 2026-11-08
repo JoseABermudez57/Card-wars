@@ -92,7 +92,8 @@ internal static class Program
         var life = b.Me.Life;
         a.SendRawAsync(MessageType.PlayCard, payload, "dup-1").Wait();   // reintento idéntico
         WaitUntil(() => false, 500, a, b);
-        Check(b.Me.Life == life && b.Me.Life == 60, $"vida de B debería seguir en 60, es {b.Me.Life}");
+        Check(b.Me.Life == life && b.Me.Life == b.Me.MaxLife - 40,
+              $"vida de B debería seguir en {b.Me.MaxLife - 40}, es {b.Me.Life}");
         Dispose(a, b);
     }
 
@@ -123,7 +124,8 @@ internal static class Program
         b.RematchAsync().Wait();
         Check(WaitUntil(() => a.State.Status == GameStatus.InProgress && b.State.Status == GameStatus.InProgress,
                         3000, a, b), "la revancha no empezó");
-        Check(a.Me.Life == 100 && a.Me.Hand.Count == 3, "estado inicial incorrecto tras la revancha");
+        Check(a.Me.MaxLife > 0 && a.Me.Life == a.Me.MaxLife && a.Me.Hand.Count == 3,
+              "estado inicial incorrecto tras la revancha");
         Dispose(a, b);
     }
 

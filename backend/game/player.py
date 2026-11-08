@@ -11,7 +11,12 @@ from dataclasses import dataclass, field
 
 from .cards import CardInstance
 
-STARTING_LIFE = 100
+# Vida inicial. Ajustada por equilibrio (tools/balance_report.py): con 100 la vida
+# nunca decidía nada (100 % de partidas por "sin criaturas") y el segundo jugador
+# ganaba ~83 % de los enfrentamientos. Con 60: ~48 % / 52 % y un tercio de las
+# partidas se deciden por daño directo. Como los daños son múltiplos de 10, solo
+# importan saltos de 10: con 50 domina P1 (~92 %), con 70 domina P2 (~77 %).
+STARTING_LIFE = 60
 
 
 @dataclass
@@ -58,6 +63,7 @@ class Player:
             "player_id": self.player_id,
             "name": self.name,
             "life": self.life,
+            "max_life": STARTING_LIFE,   # los clientes dibujan la barra con esto (sin fijar 100)
             "field": [self.creature.to_dict()] if self.creature else [],
             "discard": list(self.discard),
             "hand_count": len(self.hand),

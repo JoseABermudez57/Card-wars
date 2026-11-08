@@ -58,9 +58,10 @@ turn = a.state["turn_number"]
 b.got.clear()
 a.send("play_card", {"card_id": "mage", "expected_turn": turn, "source": "ui"}, action=True)
 b.wait()
+start = b.state["players"][0]["max_life"]
 lives = {p["name"]: p["life"] for p in b.state["players"]}
 print("Vidas vistas por B:", lives)
-assert lives == {"A": 100, "B": 60}, lives
+assert lives == {"A": start, "B": start - 40}, lives
 for p in (a, b):
     p.sio.disconnect()
 print("OK: evento en tiempo real recibido por el otro jugador")

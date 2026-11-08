@@ -171,7 +171,7 @@ namespace CardWars.UnityClient
                 var turn = state.CurrentPlayerId == player.PlayerId ? "  <color=yellow>[turno]</color>" : "";
                 var offline = player.Connected ? "" : "  <color=red>[desconectado]</color>";
                 GUILayout.Label($"<b>{title}: {player.Name}</b>{turn}{offline}", RichLabel(16));
-                GUILayout.Label($"Vida: {player.Life}   Mano: {player.HandCount}   Descarte: {player.Discard?.Count ?? 0}");
+                GUILayout.Label($"Vida: {player.Life}/{player.MaxLife}   Mano: {player.HandCount}   Descarte: {player.Discard?.Count ?? 0}");
                 var c = player.Creature;
                 GUILayout.Label(c == null ? "Mesa: (vacía)" : $"Mesa: {c.Name}  ATK {c.Attack}  HP {c.Hp}/{c.MaxHp}");
             }

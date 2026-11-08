@@ -322,8 +322,10 @@ namespace CardWars.Presentation
         {
             var me = state.Players.FirstOrDefault(p => p.PlayerId == _myId) ?? state.Players.FirstOrDefault();
             var rival = state.Players.FirstOrDefault(p => p != me);
-            _myAvatar.Show(me?.PlayerId, me?.Name, me?.Life ?? PlayerAvatarView.MaxLife, me?.Connected ?? true);
-            _rivalAvatar.Show(rival?.PlayerId, rival?.Name, rival?.Life ?? PlayerAvatarView.MaxLife, rival?.Connected ?? true);
+            _myAvatar.Show(me?.PlayerId, me?.Name, me?.Life ?? PlayerAvatarView.DefaultMaxLife,
+                           me?.MaxLife ?? PlayerAvatarView.DefaultMaxLife, me?.Connected ?? true);
+            _rivalAvatar.Show(rival?.PlayerId, rival?.Name, rival?.Life ?? PlayerAvatarView.DefaultMaxLife,
+                              rival?.MaxLife ?? PlayerAvatarView.DefaultMaxLife, rival?.Connected ?? true);
 
             var alive = new HashSet<int>();
             foreach (var player in state.Players)
@@ -421,7 +423,7 @@ namespace CardWars.Presentation
             {
                 if (avatar == null || !avatar.HasPlayer) continue;
                 var who = avatar == _myAvatar ? " (tú)" : "";
-                Label(cam, avatar.LabelAnchor, $"{avatar.DisplayName}{who}  Vida {avatar.Life}", new Color(1f, 0.9f, 0.6f), 15, scale);
+                Label(cam, avatar.LabelAnchor, $"{avatar.DisplayName}{who}  Vida {avatar.Life}/{avatar.MaxLife}", new Color(1f, 0.9f, 0.6f), 15, scale);
             }
             foreach (var f in _floating)
             {

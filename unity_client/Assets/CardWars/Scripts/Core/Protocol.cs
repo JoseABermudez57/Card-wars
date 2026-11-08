@@ -102,6 +102,7 @@ namespace CardWars.Core
         public string PlayerId;
         public string Name;
         public int Life;
+        public int MaxLife;        // vida inicial del servidor (para barras); 0 en servidores antiguos
         public List<CardInstance> Field = new List<CardInstance>();
         public List<string> Discard = new List<string>();
         public int HandCount;

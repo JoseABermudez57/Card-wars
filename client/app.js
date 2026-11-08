@@ -228,8 +228,8 @@ function renderPlayer(el, p, isMe) {
       ${active ? `<span class="badge turn">${isMe ? "tu turno" : "su turno"}</span>` : ""}
     </div>
     <div class="life">
-      <div class="bar"><div class="fill" style="width:${Math.max(0, Math.min(100, p.life))}%"></div></div>
-      <span class="life-num">❤️ ${p.life}</span>
+      <div class="bar"><div class="fill" style="width:${Math.max(0, Math.min(100, (100 * p.life) / (p.max_life || 100)))}%"></div></div>
+      <span class="life-num">❤️ ${p.life}/${p.max_life ?? "?"}</span>
     </div>
     <div class="field">${creature ? creatureHtml(creature) : '<div class="slot-empty">Sin criatura</div>'}</div>
     <div class="meta">🂠 ${p.hand_count} en mano · 🪦 ${p.discard.length} descartadas</div>`;

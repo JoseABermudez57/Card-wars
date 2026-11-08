@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from game.cards import default_catalog  # noqa: E402
 from game.game_manager import DuplicateActionError, Game, GameError, GameStatus  # noqa: E402
+from game.player import STARTING_LIFE  # noqa: E402
 
 
 def types(update):
@@ -87,7 +88,7 @@ class CombatTests(GameTestCase):
     def test_direct_attack_and_turn_change(self):
         update = self.game.play_card(self.p1.player_id, "mage")
         self.assertEqual(types(update), ["card_played", "player_damaged", "turn_changed"])
-        self.assertEqual(self.p2.life, 60)
+        self.assertEqual(self.p2.life, STARTING_LIFE - 40)
         self.assertNotIn("mage", self.p1.hand)
         self.assertIs(self.game.current_player, self.p2)
 
@@ -113,13 +114,13 @@ class CombatTests(GameTestCase):
         self.assertEqual(self.p2.creature.hp, 60)
 
     def test_overflow_kills_creature_and_damages_player(self):
-        self.game.play_card(self.p1.player_id, "dragon")       # p2: 100 -> 70
+        self.game.play_card(self.p1.player_id, "dragon")       # p2: -30
         self.p1.creature.hp = 10
         update = self.game.play_card(self.p2.player_id, "mage")  # 10 a criatura, 30 a p1
         self.assertEqual(types(update), ["card_played", "creature_damaged",
                                          "creature_destroyed", "player_damaged",
                                          "turn_changed"])
-        self.assertEqual(self.p1.life, 70)
+        self.assertEqual(self.p1.life, STARTING_LIFE - 30)
         self.assertEqual(self.p1.discard, ["dragon"])
 
     def test_uids_are_per_game(self):
@@ -173,7 +174,7 @@ class LifecycleTests(GameTestCase):
                          ["rematch_requested"])
         update = self.game.request_rematch(self.p2.player_id)
         self.assertEqual(types(update), ["rematch_requested", "game_started"])
-        self.assertEqual((self.p1.life, self.p2.life), (100, 100))
+        self.assertEqual((self.p1.life, self.p2.life), (STARTING_LIFE, STARTING_LIFE))
         self.assertEqual(len(self.p2.hand), 3)
 
     def test_leave_after_finish_reopens_lobby(self):

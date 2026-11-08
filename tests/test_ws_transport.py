@@ -77,8 +77,10 @@ class WsTransportTests(unittest.TestCase):
             up = b.recv_until("state_update")
             if any(e["type"] == "card_played" for e in up["payload"]["events"]):
                 break
-        lives = {p["name"]: p["life"] for p in up["payload"]["state"]["players"]}
-        self.assertEqual(lives, {"A": 100, "B": 60})
+        players = up["payload"]["state"]["players"]
+        start = players[0]["max_life"]
+        lives = {p["name"]: p["life"] for p in players}
+        self.assertEqual(lives, {"A": start, "B": start - 40})
         self.assertTrue(wa["session_token"])
         a.close(), b.close()
 

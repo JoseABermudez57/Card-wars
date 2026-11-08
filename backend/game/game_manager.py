@@ -5,7 +5,7 @@ GameUpdate(seq, events). `seq` sube en cada cambio confirmado: los clientes
 descartan cualquier actualización con seq <= la última aplicada.
 
 Reglas del POC (v2):
-  1. Cada jugador empieza con 100 de vida y una mano con una carta de cada tipo.
+  1. Cada jugador empieza con 60 de vida (STARTING_LIFE) y una mano con una carta de cada tipo.
   2. En tu turno haces UNA acción:
        - play_card: solo si NO tienes criatura en mesa. La carta sale de tu mano,
          entra en mesa y ataca inmediatamente.
